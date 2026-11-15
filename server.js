@@ -16,6 +16,8 @@ const rzp = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
+app.get('/', (_, res) => res.json({ ok: true, service: 'payment-server' }));
+
 app.get('/api/payments/config', (_, res) => res.json({ keyId: process.env.RAZORPAY_KEY_ID }));
 
 // 1) Create order
