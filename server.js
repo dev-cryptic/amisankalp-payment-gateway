@@ -1,10 +1,11 @@
+// Razorpay payment gateway (no database): create order -> pay -> confirm -> "successful" -> certificate (one time)
+// npm i express razorpay cors dotenv puppeteer-core @sparticuz/chromium
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const Razorpay = require('razorpay');
-const puppeteer = require('puppeteer');
 
 const app = express();
 // CLIENT_ORIGIN can hold several addresses separated by commas
@@ -60,17 +61,27 @@ app.post('/api/payments/success', async (req, res) => {
 
 // 3) Certificate: built in memory, never saved to disk, and can be downloaded only once per payment.
 //    "Already downloaded" is remembered in the payment's notes on Razorpay (no database needed).
-const TEMPLATE = fs.readFileSync(path.join(__dirname, 'templates', 'amisankalp_donation_certificate.html'), 'utf8');
+const TEMPLATE_PATH = path.join(__dirname, 'templates', 'amisankalp_donation_certificate.html');
 const inProgress = new Set(); // blocks two requests for the same payment at the same moment
 
 const escapeHtml = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const fillTemplate = (values) =>
-  Object.entries(values).reduce((html, [k, v]) => html.split(`{{${k}}}`).join(escapeHtml(v)), TEMPLATE);
+  Object.entries(values).reduce(
+    (html, [k, v]) => html.split(`{{${k}}}`).join(escapeHtml(v)),
+    fs.readFileSync(TEMPLATE_PATH, 'utf8') // read only when a certificate is requested
+  );
 
+// Chrome is loaded only here, so the payment routes keep working even if the certificate fails
 async function htmlToPdf(html) {
-  const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  const chromium = (await import('@sparticuz/chromium')).default;
+  const puppeteer = (await import('puppeteer-core')).default;
+  const browser = await puppeteer.launch({
+    args: chromium.args,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless ?? 'shell',
+  });
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
@@ -119,7 +130,7 @@ app.get('/api/certificates/:paymentId', async (req, res) => {
       'Content-Disposition': `attachment; filename="Amisankalp-Certificate-${pay.id}.pdf"`,
       'Cache-Control': 'no-store',
     });
-    res.send(pdf);
+    res.send(Buffer.from(pdf));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Could not create the certificate.' });
@@ -134,37 +145,3 @@ if (require.main === module) {
   const port = process.env.PORT || 5000;
   app.listen(port, () => console.log(`Payment server running on port ${port}`));
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

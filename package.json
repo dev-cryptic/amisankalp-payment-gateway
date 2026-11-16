@@ -11,10 +11,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@sparticuz/chromium": "^147.0.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.10",
     "express": "^5.3.0",
-    "puppeteer": "^25.17.0",
+    "puppeteer-core": "^25.17.0",
     "razorpay": "^2.9.8"
   }
 }
